@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phần Mềm Quản Lý Nhà Thuốc Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Thu viện quét mã vạch qua Camera -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+    <style>
+      .tab-content {
+        display: none;
+        opacity: 0;
+        transition: opacity 0.25s ease-in-out;
+      }
+      .tab-content.active {
+        display: block;
+        opacity: 1;
+      }
+      .modal-backdrop {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease-in-out;
+      }
+      .modal-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .modal-card {
+        transform: scale(0.95);
+        transition: transform 0.25s ease-in-out;
+      }
+      .modal-backdrop.open .modal-card {
+        transform: scale(1);
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+
+      /* Style riêng cho Hóa đơn in */
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #print-section,
+        #print-section * {
+          visibility: visible;
+        }
+        #print-section {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          font-family: monospace;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-800 font-sans antialiased">
+    <div class="flex h-screen overflow-hidden">
+      <!-- Sidebar -->
+      <aside
+        class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between p-4 flex-shrink-0 select-none shadow-lg"
+      >
+        <div>
+          <div
+            class="flex items-center gap-3 px-2 py-4 border-b border-slate-800 mb-6"
+          >
+            <div
+              class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-emerald-500/20"
+            >
+              <i class="fa-solid fa-pills"></i>
+            </div>
+            <div class="overflow-hidden">
+              <h1
+                id="pharmacy-name"
+                onclick="changePharmacyName()"
+                class="font-bold text-white text-lg tracking-wide truncate cursor-pointer hover:text-emerald-400 transition-colors"
+                title="Nhấp vào đây để đổi tên"
+              >
+                PharmaCare Pro
+              </h1>
+              <p class="text-xs text-slate-400 flex items-center gap-1">
+                Quản lý nhà thuốc
+                <i class="fa-solid fa-pen text-[10px] opacity-60"></i>
+              </p>
+            </div>
+          </div>
+
+          <nav class="space-y-1">
+            <button
+              onclick="switchTab('dashboard')"
+              id="nav-dashboard"
+              class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium transition-all duration-200 shadow-sm"
+            >
+              <i class="fa-solid fa-chart-pie w-5"></i> Tổng Quan
+            </button>
+            <button
+              onclick="switchTab('inventory')"
+              id="nav-inventory"
+              class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-medium transition-all duration-200"
+            >
+              <i class="fa-solid fa-boxes-stacked w-5"></i> Kho Dược Phẩm
+            </button>
+            <button
+              onclick="switchTab('reports')"
+              id="nav-reports"
+              class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-medium transition-all duration-200"
+            >
+              <i class="fa-solid fa-receipt w-5"></i> Lịch Sử Đơn Hàng
+            </button>
+          </nav>
+        </div>
+
+        <div
+          class="border-t border-slate-800 pt-4 flex items-center gap-3 px-2"
+        >
+          <div
+            class="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-semibold text-sm"
+          >
+            DS
+          </div>
+          <div>
+            <p class="text-sm font-medium text-white">Dược sĩ Minh</p>
+            <p class="text-xs text-emerald-400 flex items-center gap-1">
+              <span
+                class="w-2 h-2 rounded-full bg-emerald-500 inline-block"
+              ></span>
+              Đã kết nối Cloud
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-y-auto p-8">
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-content active space-y-8">
+          <header class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900 tracking-tight">
+                Tổng Quan Hoạt Động
+              </h2>
+              <p class="text-slate-500 text-sm mt-1">
+                Theo dõi doanh thu, lợi nhuận và kho hàng realtime.
+              </p>
+            </div>
+            <button
+              onclick="openPosModal()"
+              class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-5 py-2.5 rounded-xl font-medium shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all duration-150"
+            >
+              <i class="fa-solid fa-cart-plus"></i> Tạo Đơn Bán Mới
+            </button>
+          </header>
+
+          <!-- Stat Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <p class="text-xs text-slate-500 font-medium">
+                Doanh Thu Hôm Nay
+              </p>
+              <h3
+                id="stat-revenue"
+                class="text-xl font-bold text-slate-900 mt-2"
+              >
+                0 ₫
+              </h3>
+            </div>
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <p class="text-xs text-slate-500 font-medium">
+                Lợi Nhuận Hôm Nay
+              </p>
+              <h3 id="stat-profit" class="text-xl font-bold text-teal-600 mt-2">
+                0 ₫
+              </h3>
+              <p
+                class="text-[11px] text-teal-600 mt-1 font-medium"
+                id="stat-profit-margin"
+              >
+                Tỷ suất: 0%
+              </p>
+            </div>
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <p class="text-xs text-slate-500 font-medium">Tổng Đơn Hàng</p>
+              <h3
+                id="stat-orders"
+                class="text-xl font-bold text-slate-900 mt-2"
+              >
+                0
+              </h3>
+            </div>
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <p class="text-xs text-slate-500 font-medium">
+                Mặt Hàng Trong Kho
+              </p>
+              <h3
+                id="stat-total-items"
+                class="text-xl font-bold text-slate-900 mt-2"
+              >
+                0
+              </h3>
+            </div>
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <p class="text-xs text-slate-500 font-medium">Cảnh Báo Tồn Kho</p>
+              <h3
+                id="stat-low-stock"
+                class="text-xl font-bold text-rose-600 mt-2"
+              >
+                0 Thuốc
+              </h3>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div
+              class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <h3 class="font-bold text-slate-800 text-lg mb-4">
+                Biểu Đồ Doanh Thu & Lợi Nhuận Tuần
+              </h3>
+              <div class="h-64 relative">
+                <canvas id="revenueChart"></canvas>
+              </div>
+            </div>
+            <div
+              class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm"
+            >
+              <h3 class="font-bold text-slate-800 text-lg mb-4">
+                Cảnh Báo Hàng Sắp Hết
+              </h3>
+              <div
+                id="low-stock-list"
+                class="space-y-3 max-h-64 overflow-y-auto pr-1"
+              ></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: QUẢN LÝ KHO -->
+        <section id="tab-inventory" class="tab-content space-y-6">
+          <div
+            class="flex flex-col md:flex-row justify-between md:items-center gap-4"
+          >
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900 tracking-tight">
+                Danh Mục Dược Phẩm & Tồn Kho
+              </h2>
+              <p class="text-slate-500 text-sm mt-1">
+                Quản lý mã thuốc, hoạt chất, số lượng tồn và hạn sử dụng.
+              </p>
+            </div>
+            <button
+              onclick="openMedicineModal()"
+              class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all"
+            >
+              <i class="fa-solid fa-plus"></i> Thêm Thuốc Mới
+            </button>
+          </div>
+
+          <div
+            class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-wrap gap-4 items-center justify-between"
+          >
+            <div class="relative flex-1 min-w-[280px]">
+              <i
+                class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"
+              ></i>
+              <input
+                id="search-input"
+                oninput="filterInventory()"
+                type="text"
+                placeholder="Tìm tên thuốc, hoạt chất, SKU..."
+                class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <select
+              id="category-filter"
+              onchange="filterInventory()"
+              class="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="">Tất cả nhóm thuốc</option>
+            </select>
+          </div>
+
+          <div
+            class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
+          >
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr
+                    class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase border-b border-slate-200/80"
+                  >
+                    <th class="p-4">Mã SKU</th>
+                    <th class="p-4">Tên Thuốc & Hoạt Chất</th>
+                    <th class="p-4">Nhóm</th>
+                    <th class="p-4">Đơn Vị</th>
+                    <th class="p-4">Giá Nhập</th>
+                    <th class="p-4">Giá Bán</th>
+                    <th class="p-4">Tồn Kho</th>
+                    <th class="p-4">Hạn Sử Dụng</th>
+                    <th class="p-4 text-center">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody
+                  id="inventory-table-body"
+                  class="divide-y divide-slate-100 text-sm"
+                ></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: BÁO CÁO -->
+        <section id="tab-reports" class="tab-content space-y-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-900 tracking-tight">
+              Lịch Sử Đơn Hàng & Thanh Toán
+            </h2>
+            <p class="text-slate-500 text-sm mt-1">
+              Danh sách các hóa đơn đã giao dịch hoàn thành.
+            </p>
+          </div>
+
+          <div
+            class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
+          >
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr
+                    class="border-b border-slate-200/80 text-slate-500 text-xs font-semibold uppercase bg-slate-50"
+                  >
+                    <th class="p-4">Mã Đơn</th>
+                    <th class="p-4">Thời Gian</th>
+                    <th class="p-4">Sản Phẩm Mua</th>
+                    <th class="p-4">Khách Đưa</th>
+                    <th class="p-4">Lợi Nhuận</th>
+                    <th class="p-4">Tổng Tiền</th>
+                    <th class="p-4 text-center">In Lại</th>
+                  </tr>
+                </thead>
+                <tbody
+                  id="sales-history-body"
+                  class="divide-y divide-slate-100 text-sm"
+                ></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- MODAL THÊM / SỬA THUỐC -->
+    <div
+      id="medicine-modal"
+      class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
+      <div
+        class="modal-card bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4"
+      >
+        <div
+          class="flex justify-between items-center border-b border-slate-100 pb-3"
+        >
+          <h3 id="modal-title" class="text-lg font-bold text-slate-900">
+            Thêm Thuốc Mới
+          </h3>
+          <button
+            onclick="closeMedicineModal()"
+            class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 flex items-center justify-center"
+          >
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+        <form
+          id="medicine-form"
+          onsubmit="saveMedicine(event)"
+          class="space-y-3"
+        >
+          <input type="hidden" id="med-id" />
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Mã SKU / Mã Vạch</label
+              >
+              <input
+                type="text"
+                id="med-sku"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Tên Thuốc</label
+              >
+              <input
+                type="text"
+                id="med-name"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Hoạt Chất</label
+              >
+              <input
+                type="text"
+                id="med-active"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Nhóm Thuốc</label
+              >
+              <input
+                type="text"
+                id="med-category"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Đơn Vị</label
+              >
+              <input
+                type="text"
+                id="med-unit"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Giá Nhập (₫)</label
+              >
+              <input
+                type="text"
+                id="med-buy"
+                required
+                oninput="formatPriceInput(this)"
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Giá Bán (₫)</label
+              >
+              <input
+                type="text"
+                id="med-sell"
+                required
+                oninput="formatPriceInput(this)"
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Số Lượng Tồn</label
+              >
+              <input
+                type="number"
+                id="med-stock"
+                required
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Hạn Sử Dụng</label
+              >
+              <input
+                type="text"
+                id="med-expiry"
+                required
+                placeholder="MM/YYYY"
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onclick="closeMedicineModal()"
+              class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700"
+            >
+              Lưu Thuốc
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL POS BÁN HÀNG + QUÉT MÃ VẠCH -->
+    <div
+      id="pos-modal"
+      class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
+      <div
+        class="modal-card bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col"
+      >
+        <div
+          class="flex justify-between items-center border-b border-slate-100 pb-3"
+        >
+          <h3 class="text-lg font-bold text-slate-900">
+            Tạo Đơn Hàng & Thanh Toán
+          </h3>
+          <button
+            onclick="closePosModal()"
+            class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 flex items-center justify-center"
+          >
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <!-- Khu vực quét Camera Mã vạch -->
+        <div
+          id="scanner-container"
+          class="hidden bg-black rounded-xl overflow-hidden relative max-h-48 flex justify-center items-center"
+        >
+          <video id="barcode-video" class="w-full h-full object-cover"></video>
+          <button
+            onclick="stopBarcodeScanner()"
+            class="absolute top-2 right-2 bg-rose-600 text-white p-1 px-3 rounded-lg text-xs"
+          >
+            Đóng Camera
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <i
+              class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"
+            ></i>
+            <input
+              type="text"
+              id="pos-search-input"
+              list="medicine-options"
+              placeholder="Nhập tên thuốc hoặc quét mã vạch..."
+              class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onkeydown="if (event.key === 'Enter') addToCart();"
+            />
+            <datalist id="medicine-options"></datalist>
+          </div>
+          <button
+            onclick="startBarcodeScanner()"
+            class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5"
+            title="Quét Mã Vạch bằng Camera"
+          >
+            <i class="fa-solid fa-barcode"></i> Quét Mã
+          </button>
+          <button
+            onclick="addToCart()"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5"
+          >
+            <i class="fa-solid fa-plus"></i> Thêm
+          </button>
+        </div>
+
+        <div
+          class="flex-1 overflow-y-auto border border-slate-200/80 rounded-xl"
+        >
+          <table class="w-full text-left border-collapse text-sm">
+            <thead
+              class="bg-slate-50 text-slate-500 font-semibold sticky top-0 border-b border-slate-200/80"
+            >
+              <tr>
+                <th class="p-3">Tên Thuốc</th>
+                <th class="p-3">Đơn Giá</th>
+                <th class="p-3 w-28">Số Lượng</th>
+                <th class="p-3">Thành Tiền</th>
+                <th class="p-3 text-center">Xóa</th>
+              </tr>
+            </thead>
+            <tbody
+              id="cart-table-body"
+              class="divide-y divide-slate-100"
+            ></tbody>
+          </table>
+        </div>
+
+        <div
+          class="border-t border-slate-100 pt-3 space-y-3 bg-slate-50 p-4 rounded-xl"
+        >
+          <div class="flex justify-between text-base font-bold text-slate-800">
+            <span>Tổng Cộng Tiền Hàng:</span>
+            <span id="pos-cart-total" class="text-emerald-600 text-lg"
+              >0 ₫</span
+            >
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Tiền Khách Đưa (₫)</label
+              >
+              <input
+                type="text"
+                id="pos-cash-given"
+                oninput="handleCashInput(this)"
+                placeholder="0"
+                class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 bg-white"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1"
+                >Tiền Thừa Trả Khách</label
+              >
+              <input
+                type="text"
+                id="pos-change-due"
+                readonly
+                value="0 ₫"
+                class="w-full border border-slate-200 bg-slate-100 rounded-xl p-2.5 text-sm font-bold text-slate-700"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onclick="closePosModal()"
+            class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
+          >
+            Hủy Bỏ
+          </button>
+          <button
+            type="button"
+            onclick="checkoutOrder()"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium shadow-sm flex items-center gap-2"
+          >
+            <i class="fa-solid fa-print"></i> Thanh Toán & In Hóa Đơn
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KHU VỰC ẨN ĐỂ IN HÓA ĐƠN -->
+    <div id="print-section" class="hidden p-4">
+      <div style="text-align: center; margin-bottom: 15px">
+        <h2
+          id="print-pharmacy-name"
+          style="font-size: 18px; font-weight: bold; margin: 0"
+        >
+          NHÀ THUỐC PHARMACARE
+        </h2>
+        <p style="font-size: 12px; margin: 2px 0">
+          Đ/C: Số 123 Đường ABC, Quận XYZ
+        </p>
+        <p style="font-size: 12px; margin: 2px 0">SĐT: 0987.654.321</p>
+        <h3 style="font-size: 15px; margin-top: 10px; font-weight: bold">
+          HÓA ĐƠN BÁN HÀNG
+        </h3>
+        <p id="print-order-id" style="font-size: 11px; margin: 0"></p>
+        <p id="print-order-date" style="font-size: 11px; margin: 0"></p>
+      </div>
+      <hr style="border-dash: 1px dashed #000; margin: 10px 0" />
+      <table
+        style="
+          width: 100%;
+          font-size: 12px;
+          text-align: left;
+          border-collapse: collapse;
+        "
+      >
+        <thead>
+          <tr>
+            <th>Tên Thuốc</th>
+            <th style="text-align: center">SL</th>
+            <th style="text-align: right">Đ.Giá</th>
+            <th style="text-align: right">T.Tiền</th>
+          </tr>
+        </thead>
+        <tbody id="print-cart-body"></tbody>
+      </table>
+      <hr style="border-dash: 1px dashed #000; margin: 10px 0" />
+      <div style="font-size: 12px; space-y: 2px">
+        <div style="display: flex; justify-content: space-between">
+          <span>Tổng tiền:</span><b id="print-total"></b>
+        </div>
+        <div style="display: flex; justify-content: space-between">
+          <span>Tiền khách đưa:</span><span id="print-cash"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between">
+          <span>Tiền thừa:</span><span id="print-change"></span>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 20px; font-size: 11px">
+        <p>Cảm ơn quý khách & Hẹn gặp lại!</p>
+      </div>
+    </div>
+
+    <!-- JAVASCRIPT CORE -->
+    <script>
+      const initialMedicines = [
+        {
+          id: "TH001",
+          sku: "8934567890123",
+          name: "Paracetamol Extra",
+          active: "Paracetamol 500mg",
+          category: "Thuốc giảm đau",
+          unit: "Hộp",
+          buyPrice: 45000,
+          sellPrice: 60000,
+          stock: 120,
+          expiry: "12/2027",
+        },
+        {
+          id: "TH002",
+          sku: "TH002",
+          name: "Augmentin 625mg",
+          active: "Amoxicillin",
+          category: "Thuốc kháng sinh",
+          unit: "Hộp",
+          buyPrice: 110000,
+          sellPrice: 140000,
+          stock: 4,
+          expiry: "10/2026",
+        },
+      ];
+
+      let medicines =
+        JSON.parse(localStorage.getItem("pharma_medicines")) ||
+        initialMedicines;
+      let orders = JSON.parse(localStorage.getItem("pharma_orders")) || [];
+      let cart = [];
+      let rawCashGiven = 0;
+      let revenueChart;
+      let codeReader = null;
+
+      function loadPharmacyName() {
+        const savedName =
+          localStorage.getItem("pharma_name") || "PharmaCare Pro";
+        document.getElementById("pharmacy-name").innerText = savedName;
+        document.title = `${savedName} - Quản Lý Nhà Thuốc`;
+      }
+
+      function changePharmacyName() {
+        const currentName =
+          localStorage.getItem("pharma_name") || "PharmaCare Pro";
+        const newName = prompt("Nhập tên nhà thuốc mới:", currentName);
+        if (newName && newName.trim() !== "") {
+          localStorage.setItem("pharma_name", newName.trim());
+          loadPharmacyName();
+        }
+      }
+
+      function formatCurrency(amount) {
+        if (!amount && amount !== 0) return "0";
+        return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      }
+
+      function parseFormattedNumber(val) {
+        if (!val) return 0;
+        return (
+          parseInt(
+            val
+              .toString()
+              .replace(/\./g, "")
+              .replace(/[^0-9]/g, ""),
+          ) || 0
+        );
+      }
+
+      function formatPriceInput(input) {
+        let rawValue = parseFormattedNumber(input.value);
+        input.value = rawValue > 0 ? formatCurrency(rawValue) : "";
+      }
+
+      function saveData() {
+        localStorage.setItem("pharma_medicines", JSON.stringify(medicines));
+        localStorage.setItem("pharma_orders", JSON.stringify(orders));
+      }
+
+      function switchTab(tabId) {
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((tab) => tab.classList.remove("active"));
+        document.getElementById(`tab-${tabId}`).classList.add("active");
+
+        document.querySelectorAll(".nav-btn").forEach((btn) => {
+          btn.classList.remove("bg-emerald-600", "text-white");
+          btn.classList.add("hover:bg-slate-800", "text-slate-400");
+        });
+
+        const activeBtn = document.getElementById(`nav-${tabId}`);
+        activeBtn.classList.add("bg-emerald-600", "text-white");
+        activeBtn.classList.remove("hover:bg-slate-800", "text-slate-400");
+
+        refreshUI();
+      }
+
+      function updateCategoryFilterOptions() {
+        const select = document.getElementById("category-filter");
+        const currentValue = select.value;
+        const categories = [
+          ...new Set(medicines.map((m) => m.category).filter(Boolean)),
+        ];
+        select.innerHTML =
+          '<option value="">Tất cả nhóm thuốc</option>' +
+          categories.map((c) => `<option value="${c}">${c}</option>`).join("");
+        select.value = currentValue;
+      }
+
+      function filterInventory() {
+        const search = document
+          .getElementById("search-input")
+          .value.toLowerCase();
+        const category = document.getElementById("category-filter").value;
+
+        const filtered = medicines.filter((m) => {
+          const matchSearch =
+            m.name.toLowerCase().includes(search) ||
+            m.active.toLowerCase().includes(search) ||
+            m.sku.toLowerCase().includes(search);
+          const matchCat = category === "" || m.category === category;
+          return matchSearch && matchCat;
+        });
+
+        renderInventoryTable(filtered);
+      }
+
+      function renderInventoryTable(data) {
+        const tbody = document.getElementById("inventory-table-body");
+        tbody.innerHTML = data
+          .map(
+            (m) => `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-4 font-semibold text-slate-900">${m.sku}</td>
+          <td class="p-4"><p class="font-semibold text-slate-800">${m.name}</p><p class="text-xs text-slate-400">${m.active}</p></td>
+          <td class="p-4"><span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">${m.category}</span></td>
+          <td class="p-4 text-slate-600">${m.unit}</td>
+          <td class="p-4 text-slate-600">${formatCurrency(m.buyPrice)} ₫</td>
+          <td class="p-4 font-semibold text-slate-800">${formatCurrency(m.sellPrice)} ₫</td>
+          <td class="p-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${m.stock <= 10 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}">${m.stock} ${m.unit}</span></td>
+          <td class="p-4 text-slate-500 text-xs">${m.expiry}</td>
+          <td class="p-4 text-center space-x-2">
+            <button onclick="openMedicineModal('${m.id}')" class="p-1.5 text-blue-600"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteMedicine('${m.id}')" class="p-1.5 text-rose-600"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `,
+          )
+          .join("");
+      }
+
+      function openMedicineModal(id = null) {
+        const modal = document.getElementById("medicine-modal");
+        modal.classList.add("open");
+        if (id) {
+          const m = medicines.find((item) => item.id === id);
+          document.getElementById("modal-title").innerText =
+            "Sửa Thông Tin Thuốc";
+          document.getElementById("med-id").value = m.id;
+          document.getElementById("med-sku").value = m.sku;
+          document.getElementById("med-name").value = m.name;
+          document.getElementById("med-active").value = m.active;
+          document.getElementById("med-category").value = m.category;
+          document.getElementById("med-unit").value = m.unit;
+          document.getElementById("med-buy").value = formatCurrency(m.buyPrice);
+          document.getElementById("med-sell").value = formatCurrency(
+            m.sellPrice,
+          );
+          document.getElementById("med-stock").value = m.stock;
+          document.getElementById("med-expiry").value = m.expiry;
+        } else {
+          document.getElementById("modal-title").innerText = "Thêm Thuốc Mới";
+          document.getElementById("medicine-form").reset();
+          document.getElementById("med-id").value = "";
+        }
+      }
+
+      function closeMedicineModal() {
+        document.getElementById("medicine-modal").classList.remove("open");
+      }
+
+      function saveMedicine(e) {
+        e.preventDefault();
+        const id = document.getElementById("med-id").value;
+        const medicineData = {
+          id: id || "TH" + Date.now(),
+          sku: document.getElementById("med-sku").value,
+          name: document.getElementById("med-name").value,
+          active: document.getElementById("med-active").value,
+          category: document.getElementById("med-category").value.trim(),
+          unit: document.getElementById("med-unit").value,
+          buyPrice: parseFormattedNumber(
+            document.getElementById("med-buy").value,
+          ),
+          sellPrice: parseFormattedNumber(
+            document.getElementById("med-sell").value,
+          ),
+          stock: Number(document.getElementById("med-stock").value),
+          expiry: document.getElementById("med-expiry").value,
+        };
+
+        if (id) {
+          const index = medicines.findIndex((m) => m.id === id);
+          medicines[index] = medicineData;
+        } else {
+          medicines.push(medicineData);
+        }
+
+        saveData();
+        closeMedicineModal();
+        refreshUI();
+      }
+
+      function deleteMedicine(id) {
+        if (confirm("Xóa thuốc này khỏi danh mục?")) {
+          medicines = medicines.filter((m) => m.id !== id);
+          saveData();
+          refreshUI();
+        }
+      }
+
+      // --- POS & QUÉT MÃ VẠCH & IN HÓA ĐƠN ---
+      function openPosModal() {
+        cart = [];
+        rawCashGiven = 0;
+
+        document.getElementById("medicine-options").innerHTML = medicines
+          .map(
+            (m) => `
+        <option value="[${m.sku}] ${m.name}">Còn: ${m.stock} ${m.unit} - Giá: ${formatCurrency(m.sellPrice)} ₫</option>
+      `,
+          )
+          .join("");
+
+        document.getElementById("pos-search-input").value = "";
+        document.getElementById("pos-cash-given").value = "";
+        document.getElementById("pos-change-due").value = "0 ₫";
+        renderCart();
+        document.getElementById("pos-modal").classList.add("open");
+      }
+
+      function closePosModal() {
+        stopBarcodeScanner();
+        document.getElementById("pos-modal").classList.remove("open");
+      }
+
+      function startBarcodeScanner() {
+        const container = document.getElementById("scanner-container");
+        container.classList.remove("hidden");
+        codeReader = new ZXing.BrowserMultiFormatReader();
+        codeReader.decodeFromVideoDevice(
+          null,
+          "barcode-video",
+          (result, err) => {
+            if (result) {
+              document.getElementById("pos-search-input").value = result.text;
+              addToCart();
+              stopBarcodeScanner();
+            }
+          },
+        );
+      }
+
+      function stopBarcodeScanner() {
+        if (codeReader) {
+          codeReader.reset();
+          codeReader = null;
+        }
+        document.getElementById("scanner-container").classList.add("hidden");
+      }
+
+      function addToCart() {
+        const inputVal = document
+          .getElementById("pos-search-input")
+          .value.trim();
+        if (!inputVal) return;
+
+        const med = medicines.find(
+          (m) =>
+            inputVal.includes(`[${m.sku}]`) ||
+            m.name.toLowerCase() === inputVal.toLowerCase() ||
+            m.sku.toLowerCase() === inputVal.toLowerCase(),
+        );
+
+        if (!med) {
+          alert("Không tìm thấy thuốc!");
+          return;
+        }
+
+        const existingItem = cart.find((item) => item.id === med.id);
+        if (existingItem) {
+          if (existingItem.qty + 1 > med.stock) {
+            alert("Hết hàng trong kho!");
+            return;
+          }
+          existingItem.qty += 1;
+        } else {
+          if (med.stock < 1) {
+            alert("Thuốc này đã hết hàng!");
+            return;
+          }
+          cart.push({
+            id: med.id,
+            name: med.name,
+            price: med.sellPrice,
+            buyPrice: med.buyPrice || 0,
+            qty: 1,
+          });
+        }
+
+        document.getElementById("pos-search-input").value = "";
+        renderCart();
+      }
+
+      function updateCartQty(index, newQty) {
+        const qty = parseInt(newQty);
+        const med = medicines.find((m) => m.id === cart[index].id);
+
+        if (qty > med.stock) {
+          alert(`Chỉ còn ${med.stock} trong kho`);
+          cart[index].qty = med.stock;
+        } else if (qty <= 0) {
+          cart.splice(index, 1);
+        } else {
+          cart[index].qty = qty;
+        }
+        renderCart();
+      }
+
+      function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+      }
+      function calculateCartTotal() {
+        return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+      }
+      function calculateCartProfit() {
+        return cart.reduce(
+          (sum, item) => sum + (item.price - item.buyPrice) * item.qty,
+          0,
+        );
+      }
+
+      function handleCashInput(input) {
+        let rawValue = parseFormattedNumber(input.value);
+        rawCashGiven = rawValue;
+        input.value = rawValue > 0 ? formatCurrency(rawValue) : "";
+        calculateChange();
+      }
+
+      function calculateChange() {
+        const total = calculateCartTotal();
+        const change = rawCashGiven - total;
+        const changeInput = document.getElementById("pos-change-due");
+        if (change >= 0) {
+          changeInput.value = formatCurrency(change) + " ₫";
+          changeInput.classList.remove("text-rose-600");
+        } else {
+          changeInput.value =
+            "Thiếu " + formatCurrency(Math.abs(change)) + " ₫";
+          changeInput.classList.add("text-rose-600");
+        }
+      }
+
+      function renderCart() {
+        const tbody = document.getElementById("cart-table-body");
+        tbody.innerHTML =
+          cart.length === 0
+            ? `<tr><td colspan="5" class="p-4 text-center text-slate-400">Chưa có sản phẩm</td></tr>`
+            : cart
+                .map(
+                  (item, index) => `
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-medium text-slate-800">${item.name}</td>
+              <td class="p-3 text-slate-600">${formatCurrency(item.price)} ₫</td>
+              <td class="p-3"><input type="number" value="${item.qty}" min="1" onchange="updateCartQty(${index}, this.value)" class="w-16 border rounded px-2 py-1 text-sm"></td>
+              <td class="p-3 font-semibold text-slate-800">${formatCurrency(item.price * item.qty)} ₫</td>
+              <td class="p-3 text-center"><button onclick="removeFromCart(${index})" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>
+          `,
+                )
+                .join("");
+
+        document.getElementById("pos-cart-total").innerText =
+          formatCurrency(calculateCartTotal()) + " ₫";
+        calculateChange();
+      }
+
+      function checkoutOrder() {
+        if (cart.length === 0) {
+          alert("Vui lòng chọn thuốc!");
+          return;
+        }
+        const total = calculateCartTotal();
+        if (rawCashGiven < total) {
+          alert("Số tiền khách đưa chưa đủ!");
+          return;
+        }
+
+        cart.forEach((cartItem) => {
+          const med = medicines.find((m) => m.id === cartItem.id);
+          if (med) med.stock -= cartItem.qty;
+        });
+
+        const newOrder = {
+          id: "HD" + Date.now().toString().slice(-6),
+          time: new Date().toLocaleString("vi-VN"),
+          items: [...cart],
+          totalTotal: total,
+          totalProfit: calculateCartProfit(),
+          cashGiven: rawCashGiven,
+          changeDue: rawCashGiven - total,
+        };
+
+        orders.unshift(newOrder);
+        saveData();
+        printInvoice(newOrder);
+        closePosModal();
+        refreshUI();
+      }
+
+      function printInvoice(order) {
+        document.getElementById("print-pharmacy-name").innerText =
+          localStorage.getItem("pharma_name") || "NHÀ THUỐC PHARMACARE";
+        document.getElementById("print-order-id").innerText =
+          "Mã HD: " + order.id;
+        document.getElementById("print-order-date").innerText =
+          "Ngày: " + order.time;
+
+        const tbody = document.getElementById("print-cart-body");
+        tbody.innerHTML = order.items
+          .map(
+            (i) => `
+        <tr>
+          <td>${i.name}</td>
+          <td style="text-align: center;">${i.qty}</td>
+          <td style="text-align: right;">${formatCurrency(i.price)}</td>
+          <td style="text-align: right;">${formatCurrency(i.price * i.qty)}</td>
+        </tr>
+      `,
+          )
+          .join("");
+
+        document.getElementById("print-total").innerText =
+          formatCurrency(order.totalTotal) + " ₫";
+        document.getElementById("print-cash").innerText =
+          formatCurrency(order.cashGiven) + " ₫";
+        document.getElementById("print-change").innerText =
+          formatCurrency(order.changeDue) + " ₫";
+
+        const printSec = document.getElementById("print-section");
+        printSec.classList.remove("hidden");
+        window.print();
+        printSec.classList.add("hidden");
+      }
+
+      function refreshUI() {
+        updateCategoryFilterOptions();
+        filterInventory();
+
+        const todayRevenue = orders.reduce((sum, o) => sum + o.totalTotal, 0);
+        const todayProfit = orders.reduce(
+          (sum, o) => sum + (o.totalProfit || 0),
+          0,
+        );
+        const profitMargin =
+          todayRevenue > 0
+            ? ((todayProfit / todayRevenue) * 100).toFixed(1)
+            : 0;
+
+        document.getElementById("stat-revenue").innerText =
+          formatCurrency(todayRevenue) + " ₫";
+        document.getElementById("stat-profit").innerText =
+          formatCurrency(todayProfit) + " ₫";
+        document.getElementById("stat-profit-margin").innerText =
+          `Tỷ suất: ${profitMargin}%`;
+        document.getElementById("stat-orders").innerText = orders.length;
+        document.getElementById("stat-total-items").innerText =
+          medicines.length;
+
+        const lowStockMeds = medicines.filter((m) => m.stock <= 10);
+        document.getElementById("stat-low-stock").innerText =
+          lowStockMeds.length + " Thuốc";
+
+        document.getElementById("sales-history-body").innerHTML = orders
+          .map(
+            (o) => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-4 font-semibold text-emerald-600">${o.id}</td>
+          <td class="p-4 text-slate-400 text-xs">${o.time}</td>
+          <td class="p-4">${o.items.map((i) => `<div class="text-xs text-slate-700">• ${i.name} x${i.qty}</div>`).join("")}</td>
+          <td class="p-4 text-slate-600">${formatCurrency(o.cashGiven)} ₫</td>
+          <td class="p-4 text-teal-600 font-semibold">+${formatCurrency(o.totalProfit || 0)} ₫</td>
+          <td class="p-4 font-bold text-slate-900">${formatCurrency(o.totalTotal)} ₫</td>
+          <td class="p-4 text-center">
+            <button onclick='printInvoice(${JSON.stringify(o)})' class="p-1.5 text-slate-600 hover:text-emerald-600"><i class="fa-solid fa-print"></i></button>
+          </td>
+        </tr>
+      `,
+          )
+          .join("");
+
+        if (revenueChart) {
+          revenueChart.data.datasets[0].data = [
+            8.5,
+            9.2,
+            10.1,
+            11.0,
+            12.8,
+            15.2,
+            todayRevenue / 1000000,
+          ];
+          revenueChart.data.datasets[1].data = [
+            2.1,
+            2.3,
+            2.8,
+            3.1,
+            3.5,
+            4.2,
+            todayProfit / 1000000,
+          ];
+          revenueChart.update();
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        loadPharmacyName();
+        const ctx = document.getElementById("revenueChart").getContext("2d");
+        revenueChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+            datasets: [
+              {
+                label: "Doanh thu (Triệu ₫)",
+                data: [8.5, 9.2, 10.1, 11.0, 12.8, 15.2, 0],
+                borderColor: "#10b981",
+                backgroundColor: "rgba(16, 185, 129, 0.05)",
+                fill: true,
+                tension: 0.35,
+              },
+              {
+                label: "Lợi nhuận (Triệu ₫)",
+                data: [2.1, 2.3, 2.8, 3.1, 3.5, 4.2, 0],
+                borderColor: "#0d9488",
+                backgroundColor: "transparent",
+                borderDash: [4, 4],
+                tension: 0.35,
+              },
+            ],
+          },
+          options: { responsive: true, maintainAspectRatio: false },
+        });
+        refreshUI();
+      });
+    </script>
+  </body>
+</html>
